@@ -1,4 +1,4 @@
-Docker Hub Repository: https://hub.docker.com/r/arfwjn/exam-score-predictor
+Docker Hub Repository: https://hub.docker.com/repository/docker/arfwjn/exam-score-predictor/general
 
 Latest Image:
 docker pull arfwjn/exam-score-predictor:latest
