@@ -4,6 +4,7 @@ import mlflow
 import mlflow.sklearn
 from sklearn.metrics import accuracy_score, precision_recall_fscore_support
 import joblib
+import os
 
 # PATH & KONSTANTA
 PREPROCESSING_DIR = './examScorePrediction_preprocessing/' 
@@ -29,12 +30,12 @@ y_test = y_test.reindex(X_test.index)
 mlflow.set_tracking_uri("file:./mlruns") 
 mlflow.set_experiment("CI_Workflow_Klasifikasi_LogisticRegression")
 
-# Autologging
+# Autologging - tetap disabled karena kita manual logging
 mlflow.sklearn.autolog(disable=True)
 
 # 3. TRAINING MODE
 
-print("Melatih Model Logistic Regression (Autolog)...")
+print("Melatih Model Logistic Regression...")
 
 # Model Klasifikasi Multikelas
 model = LogisticRegression(
@@ -43,9 +44,14 @@ model = LogisticRegression(
 )
 
 current_run_id = "N/A - Run Failed"
-with mlflow.start_run(run_name="CI_Workflow"):
-    print("Melatih Model Logistic Regression (Manual Log)...")
 
+# Cek apakah ada active run (dari mlflow run command)
+active_run = mlflow.active_run()
+
+if active_run:
+    # Jika sudah ada active run, gunakan run tersebut
+    print(f"Menggunakan existing run: {active_run.info.run_id}")
+    
     # Training model
     model.fit(X_train, y_train) 
     y_pred = model.predict(X_test)    
@@ -69,6 +75,35 @@ with mlflow.start_run(run_name="CI_Workflow"):
     mlflow.sklearn.log_model(model, "model")
     joblib.dump(model, PREPROCESSING_DIR + 'lr_model.joblib')
     
-    current_run_id = mlflow.active_run().info.run_id 
+    current_run_id = active_run.info.run_id
+else:
+    # Jika tidak ada active run, buat run baru
+    with mlflow.start_run(run_name="CI_Workflow"):
+        print("Membuat run baru untuk training...")
+        
+        # Training model
+        model.fit(X_train, y_train) 
+        y_pred = model.predict(X_test)    
+        
+        # Parameter
+        mlflow.log_param("max_iter", 500)
+        mlflow.log_param("random_state", 42)
+        
+        # Metrik
+        accuracy = accuracy_score(y_test, y_pred)
+        mlflow.log_metric("test_accuracy", accuracy)
+
+        precision, recall, f1_score, _ = precision_recall_fscore_support(
+            y_test, y_pred, average='weighted', zero_division=0
+        )
+        mlflow.log_metric("test_precision_weighted", precision)
+        mlflow.log_metric("test_recall_weighted", recall)
+        mlflow.log_metric("test_f1_score_weighted", f1_score)
+        
+        # Log model dan simpan lokal
+        mlflow.sklearn.log_model(model, "model")
+        joblib.dump(model, PREPROCESSING_DIR + 'lr_model.joblib')
+        
+        current_run_id = mlflow.active_run().info.run_id 
 
 print(f"Model Training Selesai. Run ID: {current_run_id}")
