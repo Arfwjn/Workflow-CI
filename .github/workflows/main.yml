@@ -34,6 +34,66 @@ jobs:
         run: |
           mlflow run . --experiment-name CI_Workflow_Klasifikasi_LogisticRegression
 
+      - name: Get Latest Run ID
+        id: get_run_id
+        shell: bash -el {0}
+        working-directory: MLProject
+        run: |
+          RUN_ID=$(python -c "import mlflow; client = mlflow.tracking.MlflowClient('file:./mlruns'); runs = client.search_runs(experiment_ids=['1'], order_by=['start_time DESC'], max_results=1); print(runs[0].info.run_id if runs else '')")
+          echo "run_id=$RUN_ID" >> $GITHUB_OUTPUT
+          echo "Latest Run ID: $RUN_ID"
+
+      - name: Build Docker Image using MLflow
+        shell: bash -el {0}
+        working-directory: MLProject
+        run: |
+          RUN_ID="${{ steps.get_run_id.outputs.run_id }}"
+          if [ -z "$RUN_ID" ]; then
+            echo "Error: No run ID found"
+            exit 1
+          fi
+
+          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/exam-score-predictor:latest"
+          IMAGE_NAME_VERSIONED="${{ secrets.DOCKERHUB_USERNAME }}/exam-score-predictor:$RUN_ID"
+
+          echo "Building Docker image for run: $RUN_ID"
+          mlflow models build-docker \
+            -m "runs:/$RUN_ID/model" \
+            -n "$IMAGE_NAME" \
+            --enable-mlserver
+
+          docker tag "$IMAGE_NAME" "$IMAGE_NAME_VERSIONED"
+
+          echo "image_name=$IMAGE_NAME" >> $GITHUB_OUTPUT
+          echo "image_name_versioned=$IMAGE_NAME_VERSIONED" >> $GITHUB_OUTPUT
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Push Docker Image to Docker Hub
+        shell: bash -el {0}
+        run: |
+          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/exam-score-predictor:latest"
+          RUN_ID="${{ steps.get_run_id.outputs.run_id }}"
+          IMAGE_NAME_VERSIONED="${{ secrets.DOCKERHUB_USERNAME }}/exam-score-predictor:$RUN_ID"
+
+          echo "Pushing images to Docker Hub..."
+          docker push "$IMAGE_NAME"
+          docker push "$IMAGE_NAME_VERSIONED"
+
+          echo "Docker images pushed successfully!"
+          echo "- $IMAGE_NAME"
+          echo "- $IMAGE_NAME_VERSIONED"
+
+      - name: Create Docker Hub Link File
+        run: |
+          DOCKERHUB_LINK="https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/exam-score-predictor"
+          echo "$DOCKERHUB_LINK" > MLProject/docker_hub_link.txt
+          echo "Docker Hub Link: $DOCKERHUB_LINK"
+
       - name: Upload MLflow Artefacts
         uses: actions/upload-artifact@v4
         with:
@@ -48,10 +108,13 @@ jobs:
       - name: Commit and Push Updated Model Artefacts
         run: |
           MODEL_PATH='MLProject/examScorePrediction_preprocessing/lr_model.joblib'
+          DOCKER_LINK='MLProject/docker_hub_link.txt'
 
-          git add $MODEL_PATH || true
-          git commit -m "CI: Automated model retraining and artefact update [skip ci]" || echo "No changes to commit"
+          git add $MODEL_PATH $DOCKER_LINK || true
+          git commit -m "CI: Automated model retraining, artefact update, and Docker image push [skip ci]" || echo "No changes to commit"
           git push
 
       - name: Workflow Success Message
-        run: echo "Model Retraining Complete. Model and MLflow run artefacts saved."
+        run: |
+          echo "Docker image pushed to Docker Hub"
+          echo "Docker Hub: https://hub.docker.com/r/${{ secrets.DOCKERHUB_USERNAME }}/exam-score-predictor"
