@@ -17,54 +17,41 @@ jobs:
       contents: write
 
     steps:
-      # 1. Checkout Kode
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      # 2. Setup Conda Environment
       - name: Set up Conda Environment
         uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
           python-version: 3.12.7
-          activate-environment: false
+          activate-environment: mlflow-env
+          environment-file: MLProject/conda.yaml
 
-      # 3. Instal MLflow CLI
-      - name: Install MLflow CLI
-        shell: bash
-        run: |
-          conda run --no-capture-output conda install -c conda-forge mlflow -y
-
-      # 4. Jalankan MLflow Project (Model Retraining)
       - name: Run MLflow Project (Model Retraining)
-        shell: bash
+        shell: bash -el {0}
+        working-directory: MLProject
         run: |
-          conda run --no-capture-output mlflow run MLProject -e main
+          mlflow run . --experiment-name CI_Workflow_Klasifikasi_LogisticRegression
 
-      # 5. Upload Artefak MLflow RUN
       - name: Upload MLflow Artefacts
         uses: actions/upload-artifact@v4
         with:
           name: ci-mlflow-artefacts-${{ github.run_id }}
-          path: mlruns/
+          path: MLProject/mlruns/
 
-      # 6. Konfigurasi Git Identity
       - name: Configure Git Identity
         run: |
-          conda run --no-capture-output git config user.name "github-actions[bot]"
-          conda run --no-capture-output git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
-      # 7. Commit dan Push Model/Artefak yang Diperbarui
       - name: Commit and Push Updated Model Artefacts
         run: |
           MODEL_PATH='MLProject/examScorePrediction_preprocessing/lr_model.joblib'
 
-          # Gunakan conda run untuk menjalankan git dan memastikan PATH
-          conda run --no-capture-output git add $MODEL_PATH || true
-
-          conda run --no-capture-output git commit -m "CI: Automated model retraining and artefact update [skip ci]" || echo "No changes to commit"
-
-          conda run --no-capture-output git push
+          git add $MODEL_PATH || true
+          git commit -m "CI: Automated model retraining and artefact update [skip ci]" || echo "No changes to commit"
+          git push
 
       - name: Workflow Success Message
         run: echo "Model Retraining Complete. Model and MLflow run artefacts saved."
