@@ -25,7 +25,6 @@ y_test = y_test.reindex(X_test.index)
 
 # 2. SETUP MLFLOW & AUTOLOGGING 
 
-# Tentukan lokasi penyimpanan MLflow (misalnya, di folder lokal 'mlruns')
 mlflow.set_tracking_uri("file:./mlruns") 
 mlflow.set_experiment("CI_Workflow_Klasifikasi_LogisticRegression")
 
@@ -33,13 +32,12 @@ mlflow.set_experiment("CI_Workflow_Klasifikasi_LogisticRegression")
 mlflow.sklearn.autolog() 
 
 # 3. TRAINING MODE
-with mlflow.start_run(run_name="CI_Automated_Run_Logistic_Regression"):
+with mlflow.start_run(run_name="CI_Workflow_LogisticRegression"):
     print("Melatih Model Logistic Regression (Autolog)...")
     
     # Model Klasifikasi Multikelas
     model = LogisticRegression(
         random_state=42, 
-        multi_class='multinomial',
         max_iter=500,
     )
     
