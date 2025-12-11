@@ -32,16 +32,22 @@ mlflow.set_experiment("CI_Workflow_Klasifikasi_LogisticRegression")
 mlflow.sklearn.autolog() 
 
 # 3. TRAINING MODE
-with mlflow.start_run(run_name="CI_Workflow_LogisticRegression"):
-    print("Melatih Model Logistic Regression (Autolog)...")
-    
-    # Model Klasifikasi Multikelas
-    model = LogisticRegression(
-        random_state=42, 
-        max_iter=500,
-    )
-    
-    model.fit(X_train, y_train)
-    
-    print(f"Model Training Selesai. Run ID: {mlflow.active_run().info.run_id}")
-    joblib.dump(model, PREPROCESSING_DIR + 'lr_model.joblib')
+
+print("Melatih Model Logistic Regression (Autolog)...")
+
+# Model Klasifikasi Multikelas
+model = LogisticRegression(
+    random_state=42, 
+    max_iter=500,
+)
+
+model.fit(X_train, y_train)
+
+joblib.dump(model, PREPROCESSING_DIR + 'lr_model.joblib')
+
+try:
+    current_run_id = mlflow.active_run().info.run_id
+except:
+    current_run_id = "UNKNOWN - Autologging might have failed"
+
+print(f"Model Training Selesai. Run ID: {mlflow.active_run().info.run_id}")
