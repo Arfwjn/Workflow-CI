@@ -1,0 +1,9 @@
+Docker Hub Repository: https://hub.docker.com/r/arfwjn/exam-score-predictor
+
+Latest Image:
+docker pull arfwjn/exam-score-predictor:latest
+
+Versioned Image (Run ID: 265a466efb7a4b04aba127a21c4e3ef2):
+docker pull arfwjn/exam-score-predictor:run-265a466efb7a4b04aba127a21c4e3ef2
+
+Generated at: 2025-12-11 13:27:46 UTC
